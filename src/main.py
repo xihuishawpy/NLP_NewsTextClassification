@@ -52,7 +52,7 @@ def _main():
     run_fold = run_folds[0]
     save_name = save_names[0]
     semi_a_times = 1
-    for semi_i in range(semi_a_times):
+    for _ in range(semi_a_times):
         train_flow(train_data_file, test_data_file, fold_num, run_fold, save_name, is_train=True)
         data_file_pseudo = '../user_data/' + 'train_set_pseudo_a.csv'
         pseudo_label(save_name, run_fold, data_file, test_data_file, data_file_pseudo)
@@ -67,7 +67,7 @@ def _main():
     run_fold = run_folds[1]
     save_name = save_names[1]
     semi_b_times = 1
-    for semi_i in range(semi_b_times):
+    for _ in range(semi_b_times):
         train_flow(train_data_file, test_data_file, fold_num, run_fold, save_name, is_train=True)
         data_file_pseudo = '../user_data/' + 'train_set_pseudo_b.csv'
         pseudo_label(save_name, run_fold, data_file, test_data_file, data_file_pseudo)

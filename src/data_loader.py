@@ -30,12 +30,11 @@ def sentence_split(text, vocab, max_sent_len=256, max_segment=16):
         segment = [word if word in vocab._id2word else '<UNK>' for word in segment]
         segments.append([len(segment), segment])
 
-    assert len(segments) > 0
-    if len(segments) > max_segment:
-        segment_ = int(max_segment / 2)
-        return segments[:segment_] + segments[-segment_:]
-    else:
+    assert segments
+    if len(segments) <= max_segment:
         return segments
+    segment_ = int(max_segment / 2)
+    return segments[:segment_] + segments[-segment_:]
 
 
 def get_examples(data, word_encoder, vocab, max_sent_len=256, max_segment=8):
@@ -68,9 +67,7 @@ def batch_slice(data, batch_size):
     batch_num = int(np.ceil(len(data) / float(batch_size)))
     for i in range(batch_num):
         cur_batch_size = batch_size if i < batch_num - 1 else len(data) - batch_size * i
-        docs = [data[i * batch_size + b] for b in range(cur_batch_size)]
-
-        yield docs
+        yield [data[i * batch_size + b] for b in range(cur_batch_size)]
 
 
 def data_iter(data, batch_size, shuffle=True, noise=1.0):
@@ -79,7 +76,6 @@ def data_iter(data, batch_size, shuffle=True, noise=1.0):
     ensure that the length of  sentences in each batch
     """
 
-    batched_data = []
     if shuffle:
         np.random.shuffle(data)
 
@@ -90,10 +86,8 @@ def data_iter(data, batch_size, shuffle=True, noise=1.0):
     else:
         sorted_data = data
 
-    batched_data.extend(list(batch_slice(sorted_data, batch_size)))
-
+    batched_data = list(list(batch_slice(sorted_data, batch_size)))
     if shuffle:
         np.random.shuffle(batched_data)
 
-    for batch in batched_data:
-        yield batch
+    yield from batched_data

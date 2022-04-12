@@ -249,5 +249,5 @@ def get_score(y_ture, y_pred):
 
 
 def reformat(num, n):
-    return float(format(num, '0.' + str(n) + 'f'))
+    return float(format(num, f'0.{str(n)}f'))
 

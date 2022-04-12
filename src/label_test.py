@@ -35,10 +35,7 @@ def pseudo_label(save_name, run_fold, data_file, test_file, data_file_pseudo):
     df_look['vote'] = df_vote['label']
 
     def is_all_same(ser):
-        for idx in ser.index:
-            if ser.iloc[0] != ser.loc[idx]:
-                return 0
-        return 1
+        return next((0 for idx in ser.index if ser.iloc[0] != ser.loc[idx]), 1)
     df_look['all_same'] = df_look.apply(is_all_same, axis=1)
 
 

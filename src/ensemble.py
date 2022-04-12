@@ -13,9 +13,10 @@ def vote_weight(save_names, run_folds, weights, pred_name):
         save_tests = []
         for i in range(len(save_names)):
             save_name = save_names[i]
-            for fold_i in fold_ids[i]:
-                save_test = '../user_data/' + save_name + '_' + str(fold_i) + '.csv'
-                save_tests.append(save_test)
+            save_tests.extend(
+                '../user_data/' + save_name + '_' + str(fold_i) + '.csv'
+                for fold_i in fold_ids[i]
+            )
 
         return save_tests
 
@@ -34,15 +35,13 @@ def vote_weight(save_names, run_folds, weights, pred_name):
     def vote_w(ser):
         group_cols_ls = []
         for name in save_names:
-            cols_ls = []
-            for col in ser.index:
-                if name in col:
-                    cols_ls.append(col)
+            cols_ls = [col for col in ser.index if name in col]
             group_cols_ls.append(cols_ls)
 
-        group_value_counts = []
-        for i, cols_ls in enumerate(group_cols_ls):
-            group_value_counts.append(ser[cols_ls].value_counts() * weights[i])
+        group_value_counts = [
+            ser[cols_ls].value_counts() * weights[i]
+            for i, cols_ls in enumerate(group_cols_ls)
+        ]
 
         for i, count in enumerate(group_value_counts):
             if i == 0:

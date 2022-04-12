@@ -30,7 +30,7 @@ class WhitespaceTokenizer():
     """WhitespaceTokenizer with vocab."""
 
     def __init__(self):
-        vocab_file = bert_path + 'vocab.txt'
+        vocab_file = f'{bert_path}vocab.txt'
         self._token2id = self.load_vocab(vocab_file)
         self._id2token = {v: k for k, v in self._token2id.items()}
         self.max_len = 256
@@ -42,14 +42,12 @@ class WhitespaceTokenizer():
         f = open(vocab_file, 'r')
         lines = f.readlines()
         lines = list(map(lambda x: x.strip(), lines))
-        vocab = dict(zip(lines, range(len(lines))))
-        return vocab
+        return dict(zip(lines, range(len(lines))))
 
     def tokenize(self, tokens):
         assert len(tokens) <= self.max_len - 2
         tokens = ["[CLS]"] + tokens + ["[SEP]"]
-        output_tokens = self.token2id(tokens)
-        return output_tokens
+        return self.token2id(tokens)
 
     def token2id(self, xs):
         if isinstance(xs, list):
@@ -72,7 +70,7 @@ class WordBertEncoder(nn.Module):
         self.bert = BertModel.from_pretrained(bert_path)
 
         self.pooled = False
-        logging.info('Build Bert encoder with pooled {}.'.format(self.pooled))
+        logging.info(f'Build Bert encoder with pooled {self.pooled}.')
 
     def encode(self, tokens):
         tokens = self.tokenizer.tokenize(tokens)
@@ -80,13 +78,24 @@ class WordBertEncoder(nn.Module):
 
     def get_bert_parameters(self):
         no_decay = ['bias', 'LayerNorm.weight']
-        optimizer_parameters = [
-            {'params': [p for n, p in self.bert.named_parameters() if not any(nd in n for nd in no_decay)],
-             'weight_decay': 0.01},
-            {'params': [p for n, p in self.bert.named_parameters() if any(nd in n for nd in no_decay)],
-             'weight_decay': 0.0}
+        return [
+            {
+                'params': [
+                    p
+                    for n, p in self.bert.named_parameters()
+                    if all(nd not in n for nd in no_decay)
+                ],
+                'weight_decay': 0.01,
+            },
+            {
+                'params': [
+                    p
+                    for n, p in self.bert.named_parameters()
+                    if any(nd in n for nd in no_decay)
+                ],
+                'weight_decay': 0.0,
+            },
         ]
-        return optimizer_parameters
 
     def forward(self, input_ids, token_type_ids):
         # input_ids: sen_num x bert_len
@@ -95,11 +104,7 @@ class WordBertEncoder(nn.Module):
         # sen_num x bert_len x 256, sen_num x 256
         sequence_output, pooled_output = self.bert(input_ids=input_ids, token_type_ids=token_type_ids)
 
-        if self.pooled:
-            reps = pooled_output
-        else:
-            reps = sequence_output[:, 0, :]  # sen_num x 256
-
+        reps = pooled_output if self.pooled else sequence_output[:, 0, :]
         if self.training:
             reps = self.dropout(reps)
 
@@ -159,7 +164,7 @@ class Attention(nn.Module):
         # compute attention
         outputs = torch.matmul(key, self.query)  # b x len
 
-        masked_outputs = outputs.masked_fill((1 - batch_masks).bool(), float(-1e32))
+        masked_outputs = outputs.masked_fill((1 - batch_masks).bool(), -1e+32)
 
         attn_scores = F.softmax(masked_outputs, dim=1)  # b x len
 
@@ -177,16 +182,18 @@ class Model(nn.Module):
 
     def __init__(self, vocab):
         super(Model, self).__init__()
-        self.sent_rep_size = 256
         self.doc_rep_size = sent_hidden_size * 2
+        self.sent_rep_size = 256
         self.all_parameters = {}
-        parameters = []
         self.word_encoder = WordBertEncoder()
         bert_parameters = self.word_encoder.get_bert_parameters()
 
         self.sent_encoder = SentEncoder(self.sent_rep_size)
         self.sent_attention = Attention(self.doc_rep_size)
-        parameters.extend(list(filter(lambda p: p.requires_grad, self.sent_encoder.parameters())))
+        parameters = list(
+            list(filter(lambda p: p.requires_grad, self.sent_encoder.parameters()))
+        )
+
         parameters.extend(list(filter(lambda p: p.requires_grad, self.sent_attention.parameters())))
 
         self.out = nn.Linear(self.doc_rep_size, vocab.label_size, bias=True)
@@ -197,13 +204,13 @@ class Model(nn.Module):
         if use_cuda:
             self.to(device)
 
-        if len(parameters) > 0:
+        if parameters:
             self.all_parameters["basic_parameters"] = parameters
         self.all_parameters["bert_parameters"] = bert_parameters
 
         logging.info('Build model with bert word encoder, lstm sent encoder.')
 
-        para_num = sum([np.prod(list(p.size())) for p in self.parameters()])
+        para_num = sum(np.prod(list(p.size())) for p in self.parameters())
         logging.info('Model param num: %.2f M.' % (para_num / 1e6))
 
     def forward(self, batch_inputs):
@@ -224,6 +231,4 @@ class Model(nn.Module):
         sent_hiddens = self.sent_encoder(sent_reps, sent_masks)  # b x doc_len x doc_rep_size
         doc_reps, atten_scores = self.sent_attention(sent_hiddens, sent_masks)  # b x doc_rep_size
 
-        batch_outputs = self.out(doc_reps)  # b x num_labels
-
-        return batch_outputs
+        return self.out(doc_reps)

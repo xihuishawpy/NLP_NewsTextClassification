@@ -43,8 +43,7 @@ class Optimizer:
                 self.schedulers.append(scheduler_bert)
 
                 for group in parameters:
-                    for p in group['params']:
-                        self.all_params.append(p)
+                    self.all_params.extend(iter(group['params']))
             else:
                 Exception("no nameed parameters.")
 
@@ -63,5 +62,4 @@ class Optimizer:
     def get_lr(self):
         lrs = tuple(map(lambda x: x.get_lr()[-1], self.schedulers))
         lr = ' %.5f' * self.num
-        res = lr % lrs
-        return res
+        return lr % lrs
